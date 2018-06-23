@@ -1,0 +1,133 @@
+---
+title: Explaining the lack of rigor for non-standard FDR control methods
+author: Aaron Lun
+date: "`r Sys.Date()`"
+output:
+  BiocStyle::html_document:
+    fig_caption: false
+    toc_float: true
+---
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
+```
+
+# Background
+
+There are a variety of methods to control the region-level FDR in `r Biocpkg("csaw")`:
+
+- The recommended approach with `combineTests()`, using the Benjamini-Hochberg method on region-level p-values from the Simes' method.
+- Using `clusterWindows()` to control the cluster-level FDR _post hoc_, by clustering windows detected as being significant at a window-level FDR.
+- Using `empiricalFDR()` to control the cluster-level FDR _post hoc_, by comparing windows with differing signs of log-fold change.
+
+This document details some of the deficiencies of the alternative methods, which motivates preference for `combineTests()`.
+
+# Issues with `clusterWindows()`
+
+In this function, we calculate an upper bound on the number of false positive windows.
+This is done based on the total number of detected windows at a particular window-level FDR threshold.
+An upper bound on the number of false positive clusters is computed by filling up as many clusters with false positive windows (starting from the smallest clusters).
+Division by the total number of clusters yields an upper bound on the cluster-level FDR.
+
+This involves a number of approximations:
+
+- Let $t_w$ be the window-level FDR threshold, and let the total number of windows be $N_w$.
+The upper bound on the expected number of false positive windows is approximated with $E(N_wt_w)$.
+This may not be a good approximation, with the most obvious case being when there are no true positives at all.
+In such cases, the expected number of false posiive windows should simply be $E(N_w)$ (the BH method only ensures that there is $t_w$ chance of non-zero $N_w$).
+- Let $\tilde F_c$ be the (approximate upper bound of the) expected number of false positive clusters.
+Let $T_c$ be the total observed number of clusters, and let $F_c$ be the unknown total number of false positive clusters where $E(F_c) \approx \tilde F_c$.
+The expected FDR is defined as $E(F_c/T_c)$ (putting aside the case where $T_c=0$, for simplicity), and we are approximating this with $E(\tilde F_c/T_c)$.
+
+Most of these approximations are okay if we obtain a precise upper bound on the number of false positive windows.
+A precise estimate means that the expected and observed values can be treated as interchangeable without many side effects.
+However, if the number of detected windows is low and/or they are correlated, sampling stochasticity will affect the precision of the upper bound.
+This means that the expected cluster-level FDR may not be controlled below the specified threshold.
+
+# Issues with `empiricalFDR()`
+
+Here, the number of false positives is estimated from the number of rejections in the wrong direction.
+This exploits the fact that the sign is independent of significance under the equality null, such that the distribution of p-values in each direction should be equal.
+Thus, at any given threshold, the number of rejections in the wrong direction should be the same as the number of rejections (false positives) in the right direction.
+
+However, restricting ourselves to the equality null is not sufficient in cases where `empiricalFDR()` is actually used.
+We want to avoid for non-interesting differences in binding where the statistical null hypothesis is rejected.
+This means that we need to consider the independence of the p-value and sign under arbitary alternative hypotheses.
+Unfortunately, the p-value distribution from the likelihood ratio test is not independent of the sign under arbitrary (but symmetric) null hypotheses.
+Consider the following example with 4-fold up- or down-regulation, involving libraries of different size between groups:
+
+```{r}
+library(edgeR)
+
+design <- model.matrix(~gl(2, 5))
+y1 <- matrix(rpois(100000, lambda=rep(c(5, 40), each=5)), byrow=TRUE, ncol=nrow(design)) # 4-fold change in larger library.
+fit1 <- glmFit(y1, design, dispersion=0, offset=log(rep(1:2, each=5)))
+res1 <- glmLRT(fit1)
+
+y2 <- matrix(rpois(100000, lambda=rep(c(20, 10), each=5)), byrow=TRUE, ncol=nrow(design)) # 4-fold change in smaller library.
+fit2 <- glmFit(y2, design, dispersion=0, offset=log(rep(1:2, each=5)))
+res2 <- glmLRT(fit2)
+
+d1 <- density(res1$table$LR)
+d2 <- density(res2$table$LR)
+plot(d1$x, d1$y, xlim=range(d1$x), type="l")
+lines(d2$x, d2$y, col="red")
+```
+
+... or involving a different number of libraries between groups:
+
+```{r}
+library(edgeR)
+
+design <- model.matrix(~factor(c(1,2,2,2,2)))
+y1 <- matrix(rpois(100000, lambda=c(10,40,40,40,40)), byrow=TRUE, ncol=nrow(design)) # 4-fold change in larger group.
+fit1 <- glmFit(y1, design, dispersion=0, offset=numeric(nrow(design)))
+res1 <- glmLRT(fit1)
+
+y2 <- matrix(rpois(100000, lambda=c(40,10,10,10,10)), byrow=TRUE, ncol=nrow(design)) # 4-fold change in smaller group. 
+fit2 <- glmFit(y2, design, dispersion=0, offset=numeric(nrow(design)))
+res2 <- glmLRT(fit2)
+
+d1 <- density(res1$table$LR)
+d2 <- density(res2$table$LR)
+plot(d1$x, d1$y, xlim=range(d1$x), type="l")
+lines(d2$x, d2$y, col="red")
+```
+
+This is highly relevant as many experiments will not have the same number of control libraries as ChIP libraries, mostly as a cost-saving measure.
+Asymmetric p-value distributions can reduce the estimated number of false positives and lead to underestimation of the empirical FDR:
+
+```{r}
+right <- c(rep(0, 100), runif(1000)) # 100 true positives, 1000 false positives.
+wrong <- rbeta(1000, 2, 1) # 1000 false positives, but not the same as above.
+emp <- findInterval(right, sort(wrong))/rank(right)
+o <- order(right, decreasing=TRUE)
+emp[o] <- cummin(emp[o])
+sum(which(emp<=0.05)>100)/sum(emp <= 0.05)
+```
+
+In contrast, the BH method would be able to control the FDR correctly, provided that the p-value distribution is uniform or right-skewed.
+This is because it accounts for the absolute size of the $p$-values, rather than their size relative to other $p$-values (i.e., those changing in the wrong direction).
+
+```{r}
+bh <- p.adjust(right, method="BH")
+sum(which(bh<=0.05)>100)/sum(bh <= 0.05)
+```
+
+There are also some further miscellaneous issues:
+
+- Even if we ignore the issues with statistical power, we must also consider experimental artifacts that bias rejections in one direction or another.
+This is possible if the negative control does not capture the same type of false positives that are present in the ChIP sample.
+Input controls are especially troublesome in this regard.
+- The set of p-values in the wrong direction is not completely representative of false positive regions.
+It includes p-values from regions with one or more true positive windows, which should not be considered false positives, even if they contain false positive windows.
+This results in some conservativeness as the number of false positives at any given threshold is overestimated.
+There's no obvious way to avoid this, as you'd need to know which regions were true positives to prune them out of the set.
+- The estimate of the empirical FDR will not be precise if there are not many rejections, especially at low $p$-value thresholds.
+
+# Wrapping up
+
+```{r}
+sessionInfo()
+```
+
