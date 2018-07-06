@@ -3,8 +3,8 @@ title: Subtracting input counts from ChIP samples
 author: Aaron Lun
 date: 19 August 2017
 output: 
-   html_document:
-     fig_caption: false
+  BiocStyle::html_document:
+    fig_caption: false
 ---
 
 ```{r, echo=FALSE}
@@ -31,7 +31,7 @@ I am less comfortable with using inputs for correction, where inaccuracies in th
 This is most relevant when both ChIP and control coverage are high, where subtraction is meant to be most beneficial.
 In particular, a small relative difference between libraries at large counts would be amplified in the subtracted counts.
 This leads to false positives (if between groups) or inflated variance (if within groups).
-Conservativeness seems to dominate, see the simulation in \verb!miscellaneous/subtract_control.R! for a demonstration.
+Conservativeness seems to dominate, though anticonservativeness is also possible - see the simulations below.
 - Negative counts need to be coerced to zeros, resulting in an excess of zeros that aren't easily handled by the NB model.
 Using the zero-inflated NB model is difficult, while simply filtering out low-abundance windows post-subtraction is not the solution.
 This is because you would retain windows with zeros where the other subtracted counts (e.g., for the replicate) are large due to variability for high raw counts.
@@ -69,8 +69,10 @@ Simulating counts, with an equal number of DB and non-DB sites:
 set.seed(1000)
 P <- 1/0.1
 is.null <- 1:10000
-counts <- rbind(matrix(rnbinom(10000*nlibs, mu=mu.nodb, size=P), ncol=nlibs, byrow=TRUE),
-                matrix(rnbinom(10000*nlibs, mu=mu.db, size=P), ncol=nlibs, byrow=TRUE))
+counts <- rbind(
+    matrix(rnbinom(10000*nlibs, mu=mu.nodb, size=P), ncol=nlibs, byrow=TRUE),
+    matrix(rnbinom(10000*nlibs, mu=mu.db, size=P), ncol=nlibs, byrow=TRUE)
+)
 ```
 
 # Running without subtraction
@@ -212,10 +214,12 @@ e.g., $x$ genuine binding plus $y$ background in one condition, $2(x+y)$ in the 
 This loss of power would be most problematic when DB coincides with changes in chromatin accessibility.
 This is biologically sensible but will not be detected if the latter cancels out the former (personal comm. from Gordon, Mike Love).
 
-% The ideal solution would be to switch to an identity-link GLM.
-% This would allow for subtraction-based contrasts, while preserving the mean-variance relationship.
-% However, there's the scaling effect of library size differences, which isn't easy to model with identity offsets.
-% There are also computational difficulties with enforcing positive fitted values.
+<!--
+The ideal solution would be to switch to an identity-link GLM.
+This would allow for subtraction-based contrasts, while preserving the mean-variance relationship.
+However, there's the scaling effect of library size differences, which isn't easy to model with identity offsets.
+There are also computational difficulties with enforcing positive fitted values.
+-->
 
 So, in short, it is difficult to rigorously adjust for changes in chromatin state.
 I'd say that several hundred false positives is an acceptable cost for keeping things simple, especially if you have thousands of detected regions.
