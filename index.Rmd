@@ -1,0 +1,7 @@
+---
+title: "Aaron's ChIP-seq thoughts"
+---
+
+A collection of thoughts related to ChIP-seq data analysis.
+
+- [Peak selection](peak_selection/peak_selection.html).
