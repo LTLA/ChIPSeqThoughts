@@ -4,4 +4,7 @@ title: "Aaron's ChIP-seq thoughts"
 
 A collection of thoughts related to ChIP-seq data analysis.
 
-- [Peak selection](peak_selection/peak_selection.html).
+- [Peak selection](peak_selection/peak_selection.html), and why you should avoid _ad hoc_ approaches.
+- [Count subtraction](subtract_control/subtract_control.html) for input controls, and why you... shouldn't do it.
+- [Non-standard FDR methods](nonstandard_fdr/nonstandard_fdr.html) in _csaw_, and some of their flaws.
+- [Low count normalization problems](lowcount_norm/lowcount_norm.html).
