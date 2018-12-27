@@ -10,7 +10,6 @@ output:
 
 ```{r, echo=FALSE}
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
-knitr::opts_chunk$set(fig.path="figures-peak/")
 ```
 
 # Background 
