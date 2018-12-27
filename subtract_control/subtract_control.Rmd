@@ -1,15 +1,15 @@
 ---
 title: Subtracting input counts from ChIP samples
 author: Aaron Lun
-date: 19 August 2017
+date: "`r Sys.Date()`"
 output: 
   BiocStyle::html_document:
     fig_caption: false
+    toc_float: true
 ---
 
 ```{r, echo=FALSE}
 knitr::opts_chunk$set(error=FALSE, warning=FALSE, message=FALSE)
-knitr::opts_chunk$set(fig.path="figures-subtract/")
 ```
 
 # Subtracting input from ChIP
