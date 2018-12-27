@@ -2,9 +2,13 @@
 title: "Aaron's ChIP-seq thoughts"
 ---
 
-A collection of thoughts related to ChIP-seq data analysis.
+```{r, echo=FALSE, reuslts="hide"}
+library(BiocStyle)
+```
+
+A collection of thoughts related to ChIP-seq data analysis, that didn't fit in the `r Biocpkg("csaw")` user's guide or the `r Biocpkg("chipseqDB")` workflow.
 
 - [Peak selection](peak_selection/peak_selection.html), and why you should avoid _ad hoc_ approaches.
 - [Count subtraction](subtract_control/subtract_control.html) for input controls, and why you... shouldn't do it.
-- [Non-standard FDR methods](nonstandard_fdr/nonstandard_fdr.html) in _csaw_, and some of their flaws.
-- [Low count normalization problems](lowcount_norm/lowcount_norm.html).
+- [Non-standard FDR methods](nonstandard_fdr/nonstandard_fdr.html) in `r Biocpkg("csaw")`, and some of their flaws.
+- [Low count normalization problems](lowcount_norm/lowcount_norm.html), motivating the binning or filtering methods in `r Biocpkg("csaw")` analyses.
